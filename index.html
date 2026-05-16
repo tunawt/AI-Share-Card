@@ -520,65 +520,12 @@ bindChips('width-row', c => { currentWidth = parseInt(c.dataset.width); $('captu
 bindChips('quality-row', c => { currentQuality = parseInt(c.dataset.quality); });
 bindChips('mode-row', c => { currentMode = c.dataset.mode; });
 
-$('input').value = `# Markdown 全功能展示
+$('input').value = `# 欢迎使用
 
-这是一段普通段落, 支持 **加粗**、*斜体*、~~删除线~~ 和 \`行内代码\`。
+把 AI 对话或任意 **Markdown** 内容粘贴到这里, 右侧会实时预览, 点下方按钮即可下载长图。
 
-> 引用文字看起来是这样的, 用来标注重点或他人原话。
-
-## 列表 :clipboard:
-
-- 第一项
-- 第二项
-  - 嵌套项
-- 第三项
-
-任务清单:
-- [x] 已完成任务
-- [x] 另一项完成
-- [ ] 待办事项
-
-## 表格
-
-| 列一 | 列二 | 列三 |
-|------|:----:|-----:|
-| 左对齐 | 居中 | 右对齐 |
-| A | B | C |
-
-## 代码 + 高亮
-
-\`\`\`python
-def fibonacci(n):
-    a, b = 0, 1
-    for _ in range(n):
-        yield a
-        a, b = b, a + b
-\`\`\`
-
-## 数学公式
-
-行内 $E = mc^2$, 块级:
-
-$$ \\int_{-\\infty}^{\\infty} e^{-x^2} \\, dx = \\sqrt{\\pi} $$
-
-## 流程图
-
-\`\`\`mermaid
-flowchart LR
-    A[开始] --> B{条件}
-    B -->|是| C[执行]
-    B -->|否| D[跳过]
-    C --> E[结束]
-    D --> E
-\`\`\`
-
-## Emoji
-
-:rocket: :fire: :sparkles: :thumbsup: :coffee:
-
----
-
-最后用一条分割线收尾。`;
+- 支持代码高亮、数学公式、Mermaid 流程图、表格
+- 长文会自动按一屏一页智能切分`;
 
 render();
 
