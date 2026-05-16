@@ -24,9 +24,9 @@
   --font-songti:  "Songti SC", "STSong", "SimSun", "NSimSun", Cambria, Georgia, ui-serif, serif;
   --font-mono:    ui-monospace, "SF Mono", Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 
-  --ui-bg: #ece8da;
-  --ui-panel: #faf9f5;
-  --ui-border: #d6cfbc;
+  --ui-bg: #e8e3d2;
+  --ui-panel: #f5f1e3;
+  --ui-border: #d2cab4;
   --ui-text: #3d3929;
   --ui-muted: #86827a;
   --ui-accent: #d97757;
@@ -196,11 +196,20 @@ textarea#input:focus { border-color: var(--ui-accent); }
   font-size: 12.5px; line-height: 1.55; font-family: var(--font-mono);
 }
 .content table {
-  width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 13px;
+  width: 100%; border-collapse: collapse; margin: 10px 0;
+  font-size: 11.5px;
   font-family: var(--font-system);
+  table-layout: auto;
+  letter-spacing: 0;
+  display: block;
+  overflow-x: auto;
+  max-width: 100%;
 }
 .content th, .content td {
-  border: 1px solid var(--card-line); padding: 7px 10px; text-align: left;
+  border: 1px solid var(--card-line); padding: 5px 7px; text-align: left;
+  word-wrap: break-word; overflow-wrap: anywhere;
+  vertical-align: top;
+  white-space: normal;
 }
 .content th { background: var(--card-th-bg); font-weight: 600; }
 .content a { color: var(--ui-accent); text-decoration: underline; text-underline-offset: 2px; }
@@ -225,15 +234,15 @@ textarea#input:focus { border-color: var(--ui-accent); }
 }
 
 .theme-claude #capture-area {
-  --card-text: #3d3929; --card-muted: #86827a;
-  --card-line: rgba(61, 57, 41, 0.09); --card-quote: #5c554a;
+  --card-text: #3d3929; --card-muted: #87827a;
+  --card-line: rgba(61, 57, 41, 0.10); --card-quote: #5c554a;
   --card-avatar-bg: #d97757; --card-avatar-fg: #fff;
   --card-code-inline-bg: rgba(217, 119, 87, 0.10);
   --card-code-inline-fg: #c15f3c;
-  --card-pre-bg: #3d3929; --card-pre-fg: #f5f3eb;
+  --card-pre-bg: #2c2823; --card-pre-fg: #f1ede0;
   --card-th-bg: rgba(217, 119, 87, 0.06);
-  --card-mermaid-bg: rgba(255,255,255,0.55);
-  background: #faf9f5; color: #3d3929;
+  --card-mermaid-bg: rgba(255,255,255,0.5);
+  background: #f5f1e3; color: #3d3929;
 }
 .theme-paper #capture-area {
   --card-text: #1f1d18; --card-muted: #75706a;
@@ -301,7 +310,7 @@ footer {
       </div>
       <div class="field field-full">
         <label>底部水印（每张图都会显示）</label>
-        <input id="watermark-input" type="text" value="AI-Share-Card" />
+        <input id="watermark-input" type="text" value="V&V Sharing Tool" />
       </div>
     </div>
 
@@ -574,7 +583,7 @@ flowchart LR
 render();
 
 const themeColors = {
-  claude: { bg: '#faf9f5', muted: '#86827a' },
+  claude: { bg: '#f5f1e3', muted: '#87827a' },
   paper:  { bg: '#fdfcfa', muted: '#75706a' },
   dark:   { bg: '#1c1a16', muted: '#968d80' }
 };
@@ -620,7 +629,14 @@ function updateButton() {
 function getBreakpoints(captureArea, scale) {
   const points = new Set([0]);
   const areaRect = captureArea.getBoundingClientRect();
-  const selectors = ['.card-header','.card-body','.card-footer','.content > *','.content li','.content tr'];
+  const selectors = [
+    '.card-header','.card-body','.card-footer',
+    '.content > *',
+    '.content p','.content li','.content tr',
+    '.content pre','.content blockquote','.content table',
+    '.content h1','.content h2','.content h3','.content h4',
+    '.content hr','.content .mermaid','.content .katex-display'
+  ];
   selectors.forEach(sel => {
     captureArea.querySelectorAll(sel).forEach(el => {
       const r = el.getBoundingClientRect();
@@ -630,17 +646,41 @@ function getBreakpoints(captureArea, scale) {
   });
   return [...points].filter(p => p >= 0).sort((a, b) => a - b);
 }
-function calcSplits(totalHeight, targetHeight, breakpoints) {
+function calcSplits(totalHeight, targetHeight, breakpoints, lineHeight) {
   const splits = [];
   let cursor = 0;
   while (cursor < totalHeight) {
     const idealEnd = cursor + targetHeight;
     if (idealEnd >= totalHeight) { splits.push([cursor, totalHeight]); break; }
-    const minAcceptable = cursor + targetHeight * 0.6;
-    let best = idealEnd;
+
+    // 第一优先: [0.6×target, 1.0×target] 内最靠后的元素边界
+    const minPreferred = cursor + targetHeight * 0.6;
+    let best = -1;
     for (const bp of breakpoints) {
-      if (bp > minAcceptable && bp <= idealEnd && bp > cursor + 100) best = bp;
+      if (bp >= minPreferred && bp <= idealEnd && bp > cursor + 100) {
+        if (bp > best) best = bp;
+      }
     }
+
+    // 第二优先: 把范围扩到 [0.5×, 1.15×], 找离 idealEnd 最近的元素边界
+    if (best === -1) {
+      const minExp = cursor + targetHeight * 0.5;
+      const maxExp = Math.min(cursor + targetHeight * 1.15, totalHeight);
+      let closestDist = Infinity;
+      for (const bp of breakpoints) {
+        if (bp >= minExp && bp <= maxExp && bp > cursor + 100) {
+          const d = Math.abs(bp - idealEnd);
+          if (d < closestDist) { closestDist = d; best = bp; }
+        }
+      }
+    }
+
+    // 最后退路: 找不到任何元素边界, 按行高对齐切割 (永远不切在字中间)
+    if (best === -1) {
+      const lines = Math.floor((idealEnd - cursor) / lineHeight);
+      best = cursor + Math.max(1, lines) * lineHeight;
+    }
+
     if (best <= cursor) best = idealEnd;
     splits.push([cursor, best]);
     cursor = best;
@@ -698,11 +738,17 @@ async function downloadImage() {
     const theme = themeColors[currentTheme];
     const watermark = $('watermark-input').value.trim();
     const canvas = await html2canvas(area, {
-      scale, useCORS: true, backgroundColor: null, logging: false,
+      scale, useCORS: true, backgroundColor: theme.bg, logging: false,
       windowWidth: area.scrollWidth, windowHeight: area.scrollHeight
     });
+
     const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
     const baseName = `ai-share-${currentTheme}-${currentFont}-${ts}`;
+
+    // 提取卡片实际行高 (用于 calcSplits 兜底)
+    const cardLineHeight = parseFloat(getComputedStyle(area).lineHeight) || 26;
+    const lineHeightScaled = cardLineHeight * scale;
+
     const sliceTarget = currentWidth * scale * PAGE_RATIO - chromeHeight(scale, true);
     let shouldSplit;
     if (currentMode === 'single') {
@@ -718,7 +764,7 @@ async function downloadImage() {
       downloadCanvas(finalC, `${baseName}.png`);
     } else {
       const bps = getBreakpoints(area, scale);
-      const splits = calcSplits(canvas.height, sliceTarget, bps);
+      const splits = calcSplits(canvas.height, sliceTarget, bps, lineHeightScaled);
       btn.textContent = `下载中 (共 ${splits.length} 张)...`;
       for (let i = 0; i < splits.length; i++) {
         const [start, end] = splits[i];
