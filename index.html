@@ -1,0 +1,746 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI 对话分享工具</title>
+
+<script src="./lib/marked.min.js"></script>
+<link rel="stylesheet" href="./lib/atom-one-dark.min.css">
+<script src="./lib/highlight.min.js"></script>
+<link rel="stylesheet" href="./lib/katex/katex.min.css">
+<script src="./lib/katex/katex.min.js"></script>
+<script src="./lib/katex/auto-render.min.js"></script>
+<script src="./lib/mermaid.min.js"></script>
+<script src="./lib/html2canvas.min.js"></script>
+
+<style>
+:root {
+  /* === 5 套系统字体栈 (无外部依赖) === */
+  --font-system:  system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-apple:   "PingFang SC", -apple-system, BlinkMacSystemFont, "Helvetica Neue", "Hiragino Sans GB", system-ui, sans-serif;
+  --font-windows: "Microsoft YaHei", "Microsoft YaHei UI", "Segoe UI", Tahoma, system-ui, sans-serif;
+  --font-google:  "Source Han Sans CN", "Source Han Sans SC", "Noto Sans CJK SC", "Noto Sans SC", Roboto, system-ui, sans-serif;
+  --font-songti:  "Songti SC", "STSong", "SimSun", "NSimSun", Cambria, Georgia, ui-serif, serif;
+  --font-mono:    ui-monospace, "SF Mono", Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+
+  --ui-bg: #ece8da;
+  --ui-panel: #faf9f5;
+  --ui-border: #d6cfbc;
+  --ui-text: #3d3929;
+  --ui-muted: #86827a;
+  --ui-accent: #d97757;
+  --ui-accent-hover: #c46544;
+  --ui-input-bg: #fdfcfa;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: var(--font-system);
+  background: var(--ui-bg);
+  color: var(--ui-text);
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+.tool-header { padding: 28px 20px 20px; text-align: center; }
+.tool-header h1 {
+  font-weight: 600; font-size: 26px; margin: 0; letter-spacing: -0.015em;
+}
+.tool-header p { margin: 6px 0 0; font-size: 13px; color: var(--ui-muted); letter-spacing: 0.02em; }
+.tool-container {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 20px;
+  max-width: 1280px; margin: 0 auto; padding: 8px 20px 24px;
+}
+@media (max-width: 900px) {
+  .tool-container { grid-template-columns: 1fr; padding: 8px 14px 20px; }
+  .tool-header { padding: 22px 16px 14px; }
+  .tool-header h1 { font-size: 22px; }
+}
+.panel {
+  background: var(--ui-panel); border: 1px solid var(--ui-border);
+  border-radius: 16px; padding: 20px;
+}
+.panel-title {
+  font-size: 11px; font-weight: 600; text-transform: uppercase;
+  letter-spacing: 0.12em; color: var(--ui-muted); margin-bottom: 14px;
+}
+textarea#input {
+  width: 100%; min-height: 320px; padding: 14px;
+  border: 1px solid var(--ui-border); border-radius: 10px;
+  background: var(--ui-input-bg);
+  font-family: var(--font-mono);
+  font-size: 13px; line-height: 1.65; color: var(--ui-text);
+  resize: vertical; outline: none; transition: border-color 0.15s;
+}
+textarea#input:focus { border-color: var(--ui-accent); }
+.controls { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 14px; }
+.field { display: flex; flex-direction: column; gap: 5px; }
+.field-full { grid-column: 1 / -1; }
+.field label {
+  font-size: 11px; font-weight: 500; text-transform: uppercase;
+  letter-spacing: 0.06em; color: var(--ui-muted);
+}
+.field input {
+  padding: 8px 11px; border: 1px solid var(--ui-border); border-radius: 8px;
+  background: var(--ui-input-bg); font-size: 13px; color: var(--ui-text);
+  outline: none; font-family: inherit; transition: border-color 0.15s;
+}
+.field input:focus { border-color: var(--ui-accent); }
+.chip-row { display: flex; gap: 6px; flex-wrap: wrap; }
+.chip {
+  padding: 6px 12px; border: 1px solid var(--ui-border); border-radius: 999px;
+  font-size: 12px; cursor: pointer; background: var(--ui-input-bg);
+  transition: all 0.15s; user-select: none; color: var(--ui-text);
+  white-space: nowrap;
+}
+.chip:hover { border-color: var(--ui-accent); }
+.chip.active {
+  background: var(--ui-text); color: var(--ui-panel); border-color: var(--ui-text);
+}
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  padding: 13px 24px; background: var(--ui-accent); color: white;
+  border: none; border-radius: 999px; font-family: inherit;
+  font-size: 14px; font-weight: 500; cursor: pointer;
+  transition: background 0.15s, transform 0.05s;
+  width: 100%; margin-top: 18px;
+}
+.btn:hover { background: var(--ui-accent-hover); }
+.btn:active { transform: scale(0.98); }
+.btn:disabled { opacity: 0.6; cursor: not-allowed; }
+.btn-hint {
+  text-align: center; font-size: 11.5px; color: var(--ui-muted);
+  margin-top: 8px; line-height: 1.5;
+}
+.preview-wrap { display: flex; justify-content: center; padding: 14px 0 4px; overflow-x: auto; }
+
+/* ============ 卡片本体 + 5 套字体切换 ============ */
+#capture-area {
+  width: 375px; border-radius: 18px; overflow: hidden;
+  font-size: 15px; line-height: 1.72;
+  transition: width 0.2s, background 0.2s, color 0.2s;
+  box-shadow: 0 4px 30px rgba(0,0,0,0.06);
+}
+#capture-area[data-font="system"]  { font-family: var(--font-system);  letter-spacing: 0.03em; }
+#capture-area[data-font="apple"]   { font-family: var(--font-apple);   letter-spacing: 0.025em; }
+#capture-area[data-font="windows"] { font-family: var(--font-windows); letter-spacing: 0.03em; }
+#capture-area[data-font="google"]  { font-family: var(--font-google);  letter-spacing: 0.025em; }
+#capture-area[data-font="songti"]  { font-family: var(--font-songti);  letter-spacing: 0.015em; }
+
+.card-header {
+  padding: 20px 22px 14px; display: flex; align-items: center; gap: 12px;
+  border-bottom: 1px solid var(--card-line);
+}
+.card-header.empty { display: none; }
+.avatar {
+  width: 38px; height: 38px; border-radius: 50%;
+  background: var(--card-avatar-bg); color: var(--card-avatar-fg);
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 700; font-size: 16px; flex-shrink: 0; letter-spacing: 0;
+}
+.avatar.empty { display: none; }
+.card-title {
+  font-weight: 600; font-size: 16px; margin: 0;
+  letter-spacing: 0.02em; color: var(--card-text);
+}
+.card-title.empty { display: none; }
+.card-sub {
+  font-family: var(--font-system);
+  font-size: 11.5px; color: var(--card-muted); margin-top: 2px;
+  letter-spacing: 0.04em;
+}
+.card-sub.empty { display: none; }
+.card-body { padding: 14px 22px 18px; }
+.card-footer {
+  font-family: var(--font-system);
+  padding: 12px 22px; border-top: 1px solid var(--card-line);
+  font-size: 11px; color: var(--card-muted);
+  letter-spacing: 0.05em; text-align: center;
+}
+.card-footer.empty { display: none; }
+
+.content { word-wrap: break-word; color: var(--card-text); }
+.content > *:first-child { margin-top: 0; }
+.content > *:last-child { margin-bottom: 0; }
+.content h1, .content h2, .content h3, .content h4 {
+  letter-spacing: 0.01em; line-height: 1.35;
+}
+.content h1 { font-size: 22px; font-weight: 700; margin: 16px 0 8px; }
+.content h2 { font-size: 19px; font-weight: 700; margin: 14px 0 7px; }
+.content h3 { font-size: 16.5px; font-weight: 600; margin: 12px 0 6px; }
+.content h4 { font-size: 14.5px; font-weight: 600; margin: 10px 0 5px; }
+.content p { margin: 8px 0; font-weight: 400; }
+.content ul, .content ol { padding-left: 22px; margin: 8px 0; }
+.content li { margin: 3px 0; padding-left: 2px; font-weight: 400; }
+.content li::marker { color: var(--ui-accent); }
+.content ul li.task-list-item { list-style: none; margin-left: -22px; }
+.content ul li.task-list-item input { margin-right: 8px; accent-color: var(--ui-accent); }
+.content blockquote {
+  border-left: 3px solid var(--ui-accent);
+  padding: 3px 0 3px 13px; margin: 10px 0;
+  color: var(--card-quote); font-style: italic;
+}
+.content code {
+  font-family: var(--font-mono); font-size: 13px;
+  background: var(--card-code-inline-bg); color: var(--card-code-inline-fg);
+  padding: 2px 6px; border-radius: 4px; letter-spacing: 0;
+}
+.content pre {
+  background: var(--card-pre-bg); color: var(--card-pre-fg);
+  padding: 12px 14px; border-radius: 10px; overflow-x: auto; margin: 10px 0;
+  letter-spacing: 0;
+}
+.content pre code, .content pre code.hljs {
+  background: transparent !important; color: inherit; padding: 0;
+  font-size: 12.5px; line-height: 1.55; font-family: var(--font-mono);
+}
+.content table {
+  width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 13px;
+  font-family: var(--font-system);
+}
+.content th, .content td {
+  border: 1px solid var(--card-line); padding: 7px 10px; text-align: left;
+}
+.content th { background: var(--card-th-bg); font-weight: 600; }
+.content a { color: var(--ui-accent); text-decoration: underline; text-underline-offset: 2px; }
+.content hr { border: none; border-top: 1px solid var(--card-line); margin: 14px 0; }
+.content strong { font-weight: 600; color: var(--card-text); }
+.content em { font-style: italic; }
+.content del { color: var(--card-muted); }
+.content img { max-width: 100%; border-radius: 8px; margin: 10px 0; }
+.content .mermaid {
+  background: var(--card-mermaid-bg, rgba(255,255,255,0.5));
+  border-radius: 10px; padding: 12px; margin: 10px 0;
+  text-align: center; overflow-x: auto; letter-spacing: 0;
+  font-family: var(--font-system);
+}
+.content .mermaid svg { max-width: 100%; height: auto; }
+.content .katex-display { margin: 10px 0; overflow-x: auto; overflow-y: hidden; }
+.content .katex { font-size: 1.05em; }
+
+.empty-state {
+  color: var(--card-muted); font-style: italic; text-align: center;
+  padding: 40px 20px; font-size: 13.5px; letter-spacing: 0.03em;
+}
+
+.theme-claude #capture-area {
+  --card-text: #3d3929; --card-muted: #86827a;
+  --card-line: rgba(61, 57, 41, 0.09); --card-quote: #5c554a;
+  --card-avatar-bg: #d97757; --card-avatar-fg: #fff;
+  --card-code-inline-bg: rgba(217, 119, 87, 0.10);
+  --card-code-inline-fg: #c15f3c;
+  --card-pre-bg: #3d3929; --card-pre-fg: #f5f3eb;
+  --card-th-bg: rgba(217, 119, 87, 0.06);
+  --card-mermaid-bg: rgba(255,255,255,0.55);
+  background: #faf9f5; color: #3d3929;
+}
+.theme-paper #capture-area {
+  --card-text: #1f1d18; --card-muted: #75706a;
+  --card-line: rgba(0, 0, 0, 0.07); --card-quote: #463f37;
+  --card-avatar-bg: #1f1d18; --card-avatar-fg: #fdfcfa;
+  --card-code-inline-bg: rgba(0, 0, 0, 0.05);
+  --card-code-inline-fg: #1f1d18;
+  --card-pre-bg: #1f1d18; --card-pre-fg: #e8e4d8;
+  --card-th-bg: rgba(0, 0, 0, 0.03);
+  --card-mermaid-bg: rgba(0,0,0,0.02);
+  background: #fdfcfa; color: #1f1d18;
+}
+.theme-dark #capture-area {
+  --card-text: #ebe6d8; --card-muted: #968d80;
+  --card-line: rgba(255, 255, 255, 0.08); --card-quote: #c0b7a8;
+  --card-avatar-bg: #d97757; --card-avatar-fg: #1c1a16;
+  --card-code-inline-bg: rgba(217, 119, 87, 0.16);
+  --card-code-inline-fg: #f0a585;
+  --card-pre-bg: #0e0c0a; --card-pre-fg: #d4c8b5;
+  --card-th-bg: rgba(217, 119, 87, 0.08);
+  --card-mermaid-bg: rgba(255,255,255,0.04);
+  background: #1c1a16; color: #ebe6d8;
+}
+.theme-dark .content a { color: #f0a585; }
+
+footer {
+  text-align: center; padding: 12px 20px 28px;
+  font-size: 12px; color: var(--ui-muted); letter-spacing: 0.03em;
+}
+.row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 14px; }
+@media (max-width: 500px) {
+  .row-2 { grid-template-columns: 1fr; }
+  .controls { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body class="theme-claude">
+
+<div class="tool-header">
+  <h1>AI 对话分享工具</h1>
+  <p>Markdown · 数学 · 代码高亮 · 流程图 · 本地工具</p>
+</div>
+
+<div class="tool-container">
+  <div class="panel">
+    <div class="panel-title">内容输入 · Markdown</div>
+    <textarea id="input" placeholder="支持 GFM / 数学公式 / 代码高亮 / Mermaid 流程图 / Emoji 简写..."></textarea>
+
+    <div class="controls">
+      <div class="field">
+        <label>标题（留空隐藏）</label>
+        <input id="title-input" type="text" placeholder="例如：今日总结" />
+      </div>
+      <div class="field">
+        <label>副标题（留空隐藏）</label>
+        <input id="sub-input" type="text" placeholder="例如：模型名称" />
+      </div>
+      <div class="field">
+        <label>头像字（留空隐藏）</label>
+        <input id="avatar-input" type="text" maxlength="2" placeholder="A" />
+      </div>
+      <div class="field">
+        <label>卡内页脚（留空隐藏）</label>
+        <input id="footer-input" type="text" placeholder="例如：@昵称 · 2026" />
+      </div>
+      <div class="field field-full">
+        <label>底部水印（每张图都会显示）</label>
+        <input id="watermark-input" type="text" value="V&V Sharing Tool" />
+      </div>
+    </div>
+
+    <div class="row-2">
+      <div class="field">
+        <label>主题风格</label>
+        <div class="chip-row" id="theme-row">
+          <div class="chip active" data-theme="claude">米色</div>
+          <div class="chip" data-theme="paper">羊皮纸</div>
+          <div class="chip" data-theme="dark">暗色</div>
+        </div>
+      </div>
+      <div class="field">
+        <label>字体（本机系统字 · 无外部依赖）</label>
+        <div class="chip-row" id="font-row">
+          <div class="chip active" data-font="system">本机默认</div>
+          <div class="chip" data-font="apple">Apple</div>
+          <div class="chip" data-font="windows">Windows</div>
+          <div class="chip" data-font="google">Android</div>
+          <div class="chip" data-font="songti">宋体</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="row-2">
+      <div class="field">
+        <label>卡片宽度</label>
+        <div class="chip-row" id="width-row">
+          <div class="chip active" data-width="375">手机 375</div>
+          <div class="chip" data-width="480">中宽 480</div>
+          <div class="chip" data-width="640">桌面 640</div>
+        </div>
+      </div>
+      <div class="field">
+        <label>清晰度</label>
+        <div class="chip-row" id="quality-row">
+          <div class="chip" data-quality="2">标清 2x</div>
+          <div class="chip active" data-quality="3">高清 3x</div>
+          <div class="chip" data-quality="4">超清 4x</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="row-2">
+      <div class="field field-full">
+        <label>导出方式</label>
+        <div class="chip-row" id="mode-row">
+          <div class="chip active" data-mode="single">长图（默认）</div>
+          <div class="chip" data-mode="split">切分（一页一屏）</div>
+        </div>
+      </div>
+    </div>
+
+    <button class="btn" id="download-btn" onclick="downloadImage()">下载图片</button>
+    <div class="btn-hint" id="btn-hint"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title">预览 · 实时</div>
+    <div class="preview-wrap">
+      <div id="capture-area" data-font="system">
+        <div class="card-header" id="card-header">
+          <div class="avatar" id="avatar"></div>
+          <div id="title-block">
+            <div class="card-title" id="card-title"></div>
+            <div class="card-sub" id="card-sub"></div>
+          </div>
+        </div>
+        <div class="card-body">
+          <div id="content" class="content">
+            <div class="empty-state">等待 Markdown 输入...</div>
+          </div>
+        </div>
+        <div class="card-footer" id="card-footer">
+          <span id="footer-text"></span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<footer>
+  纯静态单文件 · 系统字体 · 5 套切换 (本机 / Mac / Win / Google / 宋体)
+</footer>
+
+<script>
+// Canvas 用的简化字体栈 (与 CSS 变量对应)
+const fontStacksCanvas = {
+  system:  'system-ui, -apple-system, sans-serif',
+  apple:   '"PingFang SC", -apple-system, "Helvetica Neue", sans-serif',
+  windows: '"Microsoft YaHei", "Segoe UI", sans-serif',
+  google:  '"Source Han Sans CN", "Noto Sans CJK SC", Roboto, sans-serif',
+  songti:  '"Songti SC", "SimSun", Cambria, Georgia, serif'
+};
+const SYSTEM_FONT_SANS = fontStacksCanvas.system;
+
+const emojiMap = {
+  smile:'😊',joy:'😂',heart:'❤️',fire:'🔥',star:'⭐',rocket:'🚀',
+  check:'✅',x:'❌',warning:'⚠️',bulb:'💡',book:'📖',pencil:'✏️',
+  clap:'👏',thumbsup:'👍',thumbsdown:'👎',ok:'👌',pray:'🙏',muscle:'💪',
+  eyes:'👀',brain:'🧠',thinking:'🤔',sunglasses:'😎',cry:'😢',sob:'😭',
+  laughing:'😆',wink:'😉',sweat:'😅',cool:'🆒',new:'🆕',top:'🔝',
+  moneybag:'💰',chart:'📊',chartup:'📈',chartdown:'📉',gem:'💎',coin:'🪙',
+  zap:'⚡',sparkles:'✨',tada:'🎉',gift:'🎁',crown:'👑',trophy:'🏆',
+  apple:'🍎',coffee:'☕',beer:'🍺',pizza:'🍕',
+  sun:'☀️',moon:'🌙',cloud:'☁️',rainbow:'🌈',earth:'🌍',
+  red:'🔴',green:'🟢',blue:'🔵',yellow:'🟡',orange:'🟠',
+  arrow_right:'➡️',arrow_left:'⬅️',arrow_up:'⬆️',arrow_down:'⬇️',
+  bull:'🐂',bear:'🐻',clock:'🕐',calendar:'📅',
+  lock:'🔒',unlock:'🔓',key:'🔑',mag:'🔍',pin:'📌',link:'🔗',
+  clipboard:'📋'
+};
+function replaceEmoji(text) {
+  return text.replace(/:([a-z0-9_+-]+):/g, (m, name) => emojiMap[name] || m);
+}
+
+if (window.mermaid) {
+  mermaid.initialize({ startOnLoad: false, theme: 'neutral', securityLevel: 'loose' });
+}
+
+const renderer = new marked.Renderer();
+const originalCode = renderer.code.bind(renderer);
+let mermaidCounter = 0;
+renderer.code = function(code, language) {
+  if (language === 'mermaid') {
+    mermaidCounter++;
+    return `<div class="mermaid" data-mid="m${Date.now()}-${mermaidCounter}">${code}</div>`;
+  }
+  return originalCode(code, language);
+};
+marked.setOptions({ renderer, breaks: true, gfm: true });
+
+const $ = (id) => document.getElementById(id);
+let renderTimer;
+function scheduleRender() {
+  clearTimeout(renderTimer);
+  renderTimer = setTimeout(render, 250);
+}
+
+async function render() {
+  let raw = $('input').value.trim();
+  if (!raw) {
+    $('content').innerHTML = '<div class="empty-state">等待 Markdown 输入...</div>';
+  } else {
+    raw = replaceEmoji(raw);
+    $('content').innerHTML = marked.parse(raw);
+    if (window.hljs) {
+      $('content').querySelectorAll('pre code').forEach(block => {
+        try { hljs.highlightElement(block); } catch (e) {}
+      });
+    }
+    if (window.renderMathInElement) {
+      try {
+        renderMathInElement($('content'), {
+          delimiters: [
+            { left: '$$', right: '$$', display: true },
+            { left: '$', right: '$', display: false },
+            { left: '\\(', right: '\\)', display: false },
+            { left: '\\[', right: '\\]', display: true }
+          ],
+          throwOnError: false
+        });
+      } catch (e) { console.warn('KaTeX error:', e); }
+    }
+    const blocks = $('content').querySelectorAll('.mermaid');
+    if (blocks.length && window.mermaid) {
+      try { await mermaid.run({ nodes: blocks }); }
+      catch (e) { console.warn('Mermaid error:', e); }
+    }
+  }
+
+  const t = $('title-input').value.trim();
+  const s = $('sub-input').value.trim();
+  const a = $('avatar-input').value.trim();
+  const f = $('footer-input').value.trim();
+  $('card-title').textContent = t;
+  $('card-sub').textContent = s;
+  $('avatar').textContent = a.slice(0, 2);
+  $('footer-text').textContent = f;
+  $('card-title').classList.toggle('empty', !t);
+  $('card-sub').classList.toggle('empty', !s);
+  $('avatar').classList.toggle('empty', !a);
+  $('card-header').classList.toggle('empty', !t && !s && !a);
+  $('card-footer').classList.toggle('empty', !f);
+
+  updateButton();
+}
+
+['input','title-input','sub-input','avatar-input','footer-input','watermark-input'].forEach(id => {
+  $(id).addEventListener('input', scheduleRender);
+});
+
+let currentTheme = 'claude', currentQuality = 3, currentMode = 'single', currentWidth = 375, currentFont = 'system';
+function bindChips(rowId, cb) {
+  document.querySelectorAll(`#${rowId} .chip`).forEach(chip => {
+    chip.addEventListener('click', () => {
+      document.querySelectorAll(`#${rowId} .chip`).forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+      cb(chip);
+      updateButton();
+    });
+  });
+}
+bindChips('theme-row', c => { currentTheme = c.dataset.theme; document.body.className = `theme-${currentTheme}`; });
+bindChips('font-row',  c => { currentFont  = c.dataset.font;  $('capture-area').dataset.font = currentFont; });
+bindChips('width-row', c => { currentWidth = parseInt(c.dataset.width); $('capture-area').style.width = currentWidth + 'px'; });
+bindChips('quality-row', c => { currentQuality = parseInt(c.dataset.quality); });
+bindChips('mode-row', c => { currentMode = c.dataset.mode; });
+
+$('input').value = `# Markdown 全功能展示
+
+这是一段普通段落, 支持 **加粗**、*斜体*、~~删除线~~ 和 \`行内代码\`。
+
+> 引用文字看起来是这样的, 用来标注重点或他人原话。
+
+## 列表 :clipboard:
+
+- 第一项
+- 第二项
+  - 嵌套项
+- 第三项
+
+任务清单:
+- [x] 已完成任务
+- [x] 另一项完成
+- [ ] 待办事项
+
+## 表格
+
+| 列一 | 列二 | 列三 |
+|------|:----:|-----:|
+| 左对齐 | 居中 | 右对齐 |
+| A | B | C |
+
+## 代码 + 高亮
+
+\`\`\`python
+def fibonacci(n):
+    a, b = 0, 1
+    for _ in range(n):
+        yield a
+        a, b = b, a + b
+\`\`\`
+
+## 数学公式
+
+行内 $E = mc^2$, 块级:
+
+$$ \\int_{-\\infty}^{\\infty} e^{-x^2} \\, dx = \\sqrt{\\pi} $$
+
+## 流程图
+
+\`\`\`mermaid
+flowchart LR
+    A[开始] --> B{条件}
+    B -->|是| C[执行]
+    B -->|否| D[跳过]
+    C --> E[结束]
+    D --> E
+\`\`\`
+
+## Emoji
+
+:rocket: :fire: :sparkles: :thumbsup: :coffee:
+
+---
+
+最后用一条分割线收尾。`;
+
+render();
+
+const themeColors = {
+  claude: { bg: '#faf9f5', muted: '#86827a' },
+  paper:  { bg: '#fdfcfa', muted: '#75706a' },
+  dark:   { bg: '#1c1a16', muted: '#968d80' }
+};
+const PAGE_RATIO = 2.0;
+const MAX_SINGLE_OUTPUT_HEIGHT = 10000;
+
+function chromeHeight(scale, hasFooter) {
+  const padTop = 22, gapBot = hasFooter ? 10 : 0, footerH = hasFooter ? 16 : 0, padBot = 22;
+  return (padTop + gapBot + footerH + padBot) * scale;
+}
+function estimatePages() {
+  const area = $('capture-area');
+  const cardH = area.offsetHeight;
+  const scale = currentQuality;
+  const canvasH = cardH * scale;
+  const hasWm = $('watermark-input').value.trim().length > 0;
+  if (currentMode === 'single') {
+    const chrome = chromeHeight(scale, hasWm);
+    if (canvasH + chrome <= MAX_SINGLE_OUTPUT_HEIGHT) return { pages: 1, forced: false };
+    const target = currentWidth * scale * PAGE_RATIO - chromeHeight(scale, true);
+    return { pages: Math.max(2, Math.ceil(canvasH / target)), forced: true };
+  } else {
+    const target = currentWidth * scale * PAGE_RATIO - chromeHeight(scale, true);
+    if (canvasH <= target) return { pages: 1, forced: false };
+    return { pages: Math.ceil(canvasH / target), forced: false };
+  }
+}
+function updateButton() {
+  const btn = $('download-btn');
+  const hint = $('btn-hint');
+  const { pages, forced } = estimatePages();
+  if (forced) {
+    btn.textContent = `下载图片（自动切分 ${pages} 张）`;
+    hint.textContent = `长图超过 ${MAX_SINGLE_OUTPUT_HEIGHT}px 上限, 将切分输出`;
+  } else if (pages > 1) {
+    btn.textContent = `下载图片（${pages} 张）`;
+    hint.textContent = `按一屏一页切分, 每张约 ${PAGE_RATIO}:1 比例`;
+  } else {
+    btn.textContent = `下载图片`;
+    hint.textContent = '';
+  }
+}
+function getBreakpoints(captureArea, scale) {
+  const points = new Set([0]);
+  const areaRect = captureArea.getBoundingClientRect();
+  const selectors = ['.card-header','.card-body','.card-footer','.content > *','.content li','.content tr'];
+  selectors.forEach(sel => {
+    captureArea.querySelectorAll(sel).forEach(el => {
+      const r = el.getBoundingClientRect();
+      points.add(Math.round((r.top - areaRect.top) * scale));
+      points.add(Math.round((r.bottom - areaRect.top) * scale));
+    });
+  });
+  return [...points].filter(p => p >= 0).sort((a, b) => a - b);
+}
+function calcSplits(totalHeight, targetHeight, breakpoints) {
+  const splits = [];
+  let cursor = 0;
+  while (cursor < totalHeight) {
+    const idealEnd = cursor + targetHeight;
+    if (idealEnd >= totalHeight) { splits.push([cursor, totalHeight]); break; }
+    const minAcceptable = cursor + targetHeight * 0.6;
+    let best = idealEnd;
+    for (const bp of breakpoints) {
+      if (bp > minAcceptable && bp <= idealEnd && bp > cursor + 100) best = bp;
+    }
+    if (best <= cursor) best = idealEnd;
+    splits.push([cursor, best]);
+    cursor = best;
+  }
+  return splits;
+}
+function composePage(srcCanvas, sliceY, sliceH, opts) {
+  const { totalPages, pageIndex, scale, theme, showPageLabel, watermark } = opts;
+  const parts = [];
+  if (watermark) parts.push(watermark);
+  if (showPageLabel) parts.push(`Page ${pageIndex} / ${totalPages}`);
+  const footerText = parts.join('   ·   ');
+  const hasFooter = footerText.length > 0;
+  const padTop = 22 * scale;
+  const gapBot = hasFooter ? 10 * scale : 0;
+  const footerH = hasFooter ? 16 * scale : 0;
+  const padBot = 22 * scale;
+  const extraH = padTop + gapBot + footerH + padBot;
+  const out = document.createElement('canvas');
+  out.width = srcCanvas.width;
+  out.height = sliceH + extraH;
+  const ctx = out.getContext('2d');
+  ctx.fillStyle = theme.bg;
+  ctx.fillRect(0, 0, out.width, out.height);
+  ctx.drawImage(srcCanvas, 0, sliceY, srcCanvas.width, sliceH, 0, padTop, srcCanvas.width, sliceH);
+  if (hasFooter) {
+    ctx.fillStyle = theme.muted;
+    // 底部小字一律 sans (即使卡片选了宋体), 小字宋体读不清
+    ctx.font = `${10 * scale}px ${SYSTEM_FONT_SANS}`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    if ('letterSpacing' in ctx) {
+      try { ctx.letterSpacing = `${0.4 * scale}px`; } catch (e) {}
+    }
+    ctx.fillText(footerText, out.width / 2, padTop + sliceH + gapBot + footerH / 2);
+  }
+  return out;
+}
+function downloadCanvas(canvas, filename) {
+  const link = document.createElement('a');
+  link.download = filename;
+  link.href = canvas.toDataURL('image/png');
+  link.click();
+}
+async function downloadImage() {
+  const btn = $('download-btn');
+  const area = $('capture-area');
+  const originalText = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = '渲染中...';
+  try {
+    if (document.fonts && document.fonts.ready) await document.fonts.ready;
+    await new Promise(r => setTimeout(r, 200));
+    const scale = currentQuality;
+    const theme = themeColors[currentTheme];
+    const watermark = $('watermark-input').value.trim();
+    const canvas = await html2canvas(area, {
+      scale, useCORS: true, backgroundColor: null, logging: false,
+      windowWidth: area.scrollWidth, windowHeight: area.scrollHeight
+    });
+    const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    const baseName = `ai-share-${currentTheme}-${currentFont}-${ts}`;
+    const sliceTarget = currentWidth * scale * PAGE_RATIO - chromeHeight(scale, true);
+    let shouldSplit;
+    if (currentMode === 'single') {
+      shouldSplit = (canvas.height + chromeHeight(scale, !!watermark)) > MAX_SINGLE_OUTPUT_HEIGHT;
+    } else {
+      shouldSplit = canvas.height > sliceTarget;
+    }
+    if (!shouldSplit) {
+      btn.textContent = '生成中...';
+      const finalC = composePage(canvas, 0, canvas.height, {
+        scale, theme, showPageLabel: false, watermark, totalPages: 1, pageIndex: 1
+      });
+      downloadCanvas(finalC, `${baseName}.png`);
+    } else {
+      const bps = getBreakpoints(area, scale);
+      const splits = calcSplits(canvas.height, sliceTarget, bps);
+      btn.textContent = `下载中 (共 ${splits.length} 张)...`;
+      for (let i = 0; i < splits.length; i++) {
+        const [start, end] = splits[i];
+        const finalC = composePage(canvas, start, end - start, {
+          scale, theme, showPageLabel: true, watermark,
+          totalPages: splits.length, pageIndex: i + 1
+        });
+        const idx = String(i + 1).padStart(2, '0');
+        const total = String(splits.length).padStart(2, '0');
+        downloadCanvas(finalC, `${baseName}_${idx}-of-${total}.png`);
+        await new Promise(r => setTimeout(r, 350));
+      }
+    }
+  } catch (err) {
+    console.error(err);
+    alert('生成失败: ' + err.message);
+  } finally {
+    btn.textContent = originalText;
+    btn.disabled = false;
+    updateButton();
+  }
+}
+</script>
+</body>
+</html>
