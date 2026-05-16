@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>AI 对话分享工具</title>
+<title>AI对话分享为图片</title>
 
 <script src="./lib/marked.min.js"></script>
 <link rel="stylesheet" href="./lib/atom-one-dark.min.css">
@@ -34,6 +34,7 @@
   --ui-input-bg: #fdfcfa;
 }
 * { box-sizing: border-box; }
+html { overflow-x: hidden; }
 body {
   margin: 0;
   font-family: var(--font-system);
@@ -42,6 +43,9 @@ body {
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+  overflow-x: hidden;
+  overscroll-behavior-x: none;
+  max-width: 100vw;
 }
 .tool-header { padding: 28px 20px 20px; text-align: center; }
 .tool-header h1 {
@@ -171,10 +175,23 @@ textarea#input:focus { border-color: var(--ui-accent); }
 .content h3 { font-size: 16.5px; font-weight: 600; margin: 12px 0 6px; }
 .content h4 { font-size: 14.5px; font-weight: 600; margin: 10px 0 5px; }
 .content p { margin: 8px 0; font-weight: 400; }
-.content ul, .content ol { padding-left: 22px; margin: 8px 0; }
-.content li { margin: 3px 0; padding-left: 2px; font-weight: 400; }
-.content li::marker { color: var(--ui-accent); }
-.content ul li.task-list-item { list-style: none; margin-left: -22px; }
+.content ul, .content ol { padding-left: 4px; margin: 8px 0; list-style: none; }
+.content li { margin: 4px 0; padding-left: 20px; font-weight: 400; position: relative; }
+/* 无序列表 bullet: 用 ::before 替代 ::marker, 因为 html2canvas 不支持 ::marker */
+.content ul > li:not(.task-list-item)::before {
+  content: "•"; position: absolute; left: 4px;
+  color: var(--ui-accent); font-size: 1em; line-height: inherit;
+}
+/* 有序列表序号 */
+.content ol { counter-reset: ol-counter; }
+.content ol > li { counter-increment: ol-counter; }
+.content ol > li::before {
+  content: counter(ol-counter) "."; position: absolute; left: 0;
+  color: var(--ui-muted); font-size: 0.9em; font-weight: 500;
+}
+
+.content ul li.task-list-item { margin-left: 0; padding-left: 22px; }
+.content ul li.task-list-item::before { display: none; }
 .content ul li.task-list-item input { margin-right: 8px; accent-color: var(--ui-accent); }
 .content blockquote {
   border-left: 3px solid var(--ui-accent);
@@ -214,7 +231,7 @@ textarea#input:focus { border-color: var(--ui-accent); }
 .content th { background: var(--card-th-bg); font-weight: 600; }
 .content a { color: var(--ui-accent); text-decoration: underline; text-underline-offset: 2px; }
 .content hr { border: none; border-top: 1px solid var(--card-line); margin: 14px 0; }
-.content strong { font-weight: 600; color: var(--card-text); }
+.content strong { font-weight: 700; color: var(--card-text); }
 .content em { font-style: italic; }
 .content del { color: var(--card-muted); }
 .content img { max-width: 100%; border-radius: 8px; margin: 10px 0; }
@@ -520,12 +537,7 @@ bindChips('width-row', c => { currentWidth = parseInt(c.dataset.width); $('captu
 bindChips('quality-row', c => { currentQuality = parseInt(c.dataset.quality); });
 bindChips('mode-row', c => { currentMode = c.dataset.mode; });
 
-$('input').value = `# 欢迎使用
-
-把 AI 对话或任意 **Markdown** 内容粘贴到这里, 右侧会实时预览, 点下方按钮即可下载长图。
-
-- 支持代码高亮、数学公式、Mermaid 流程图、表格
-- 长文会自动按一屏一页智能切分`;
+$('input').value = '';
 
 render();
 
